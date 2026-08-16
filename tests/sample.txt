@@ -1,0 +1,5 @@
+the cat sat
+The Cat Ran
+concatenate
+dog
+cat

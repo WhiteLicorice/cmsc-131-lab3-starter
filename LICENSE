@@ -1,0 +1,71 @@
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+(CC BY-NC-SA 4.0)
+
+The full legal code is at:
+https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+A plain-language summary is at:
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+
+WHY THIS LICENSE
+
+This repository is not free to relicense. Most of it derives from Paul
+Carter's PC Assembly Language example code, released under CC BY-NC-SA 4.0:
+
+    https://github.com/pacman128/pcasm
+
+That license carries a ShareAlike condition, so adapted material has to be
+distributed under the same terms. Two files here are adaptations of Carter's
+work, and the rest of the repository is distributed under the same license so
+that the terms covering it are unambiguous.
+
+
+ATTRIBUTION
+
+Paul Carter, PC Assembly Language example code:
+
+    asm_io.asm      adapted, see below
+    asm_io.inc      adapted, see below
+    cdecl.h         unmodified
+    driver.c        unmodified
+    skel.asm        unmodified
+
+Rene Andre Bedonia Jocsing, for CMSC 131 at the University of the
+Philippines Visayas:
+
+    Makefile
+    skel.expected
+    readback.asm
+    readback.input
+    readback.expected
+    .gitattributes
+    .gitignore
+    .vscode/tasks.json
+    .github/workflows/test.yml
+    README.md
+
+
+CHANGES MADE TO CARTER'S FILES
+
+All three changes are marked in place with a comment identifying them as
+additions, and all three are described in README.md.
+
+    asm_io.inc  gained a block, active only when ELF_TYPE is defined, that
+                remaps _asm_main to asm_main and declares a .note.GNU-stack
+                section.
+
+    asm_io.asm  gained the same .note.GNU-stack declaration, because it does
+                not include asm_io.inc.
+
+    asm_io.asm  gained an echo in read_int and read_char. When stdin is not a
+                terminal, each one prints what it just read, since no terminal
+                is there to echo the keystrokes. A redirected run then produces
+                the same bytes as a typed one.
+
+
+NONCOMMERCIAL
+
+Use of this repository as course material is noncommercial use. Students may
+read, copy, run, and adapt it for their coursework. Anyone redistributing it
+or a modified version of it has to keep this license, keep the attribution
+above, and say what they changed.

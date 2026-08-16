@@ -1,0 +1,5 @@
+cat cat cat cat cat
+the cat sat and the cat ran and the cat walked
+catcat cat catcatcat
+no matches on this line at all
+dog dog dog dog dog dog dog dog dog dog

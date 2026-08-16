@@ -1,0 +1,6 @@
+a very short line
+this line is somewhat longer than the one above but still short
+this one is much longer and contains the pattern near its end somewhere
+a pattern that appears right at the start of this very long line
+and this line is the longest of all, with plenty of padding words to make it comfortably longer than any pattern that run_tests.sh will feed it, so the substring search has to scan across a genuinely long buffer before it finds anything at all
+short

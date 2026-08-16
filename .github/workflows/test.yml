@@ -1,0 +1,13 @@
+name: lab3-checks
+
+on: [push]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the 32-bit toolchain
+        run: sudo apt-get update && sudo apt-get install -y build-essential gcc-multilib nasm
+      - name: Build and check
+        run: make check

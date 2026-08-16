@@ -1,0 +1,12 @@
+# The laboratory contract runs these under bash on every platform, and make
+# check compares output byte for byte, so everything text stays LF. The .bin
+# headers must never be text-normalized: a 20-byte IPv4 header can contain
+# bytes git would mangle.
+*.asm    text eol=lf
+*.c      text eol=lf
+*.h      text eol=lf
+Makefile text eol=lf
+*.sh     text eol=lf
+tests/*.txt        text eol=lf
+tests/expected/*.out  text eol=lf
+tests/*.bin        binary
