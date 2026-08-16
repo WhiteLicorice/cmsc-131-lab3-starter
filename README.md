@@ -1,5 +1,5 @@
 <!--no-pdf-->
-# CMSC 131 Lab lab3 Starter
+# CMSC 131 Lab 3 Starter
 
 A grep clone whose correctness is agreement with the real grep, byte for byte. The manual is the assignment. This file is the repository's own notes.
 
@@ -22,10 +22,7 @@ make
 make check
 ```
 
-`make` builds `driver.c        provided: argument parsing, file reading, and output
-match.asm       yours
-lines.asm       yours
-fmt.asm         yours`. `make check` builds, then runs `./run_tests.sh`,
+`make` builds `rengrep`. `make check` builds, then runs `./run_tests.sh`,
 which reports each test and exits nonzero when any of them differ.
 
 ## Reading a First Run
