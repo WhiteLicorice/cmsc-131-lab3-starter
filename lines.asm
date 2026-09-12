@@ -25,10 +25,10 @@
 ;   * Preserve ebx, esi, edi, and ebp. Return the count in eax.
 ;   * No calls into the C standard library.
 ;
-; The manual calls this "buffer to line index, line extraction": walk the
-; buffer, record where each line starts and how long it is, and find the
-; newlines yourself. The driver reads the file into one buffer and treats
-; it as a list of lines using your index.
+; The manual calls this "buffer to line index". Walk the buffer, find the
+; newlines yourself, and record where each line starts and how long it
+; is. The driver reads the file into one buffer and uses your index to
+; treat it as a list of lines.
 ;
 
 ; Windows C puts a leading underscore on every exported name. Linux C does
@@ -58,10 +58,10 @@ _index_lines:
         ;     newline and must still be indexed.
         ;   * An empty file produces zero lines, not one empty line.
         ;
-        ; Watch the max capacity too. out holds max entries, and a file of
-        ; len bytes can have at most len lines (every byte a newline), so
-        ; the caller's max is always big enough. The routine must still
-        ; stop writing at max to be safe.
+        ; Watch the max capacity too. out holds max entries. A file of len
+        ; bytes has at most len lines, when every byte is a newline, so the
+        ; caller's max is always big enough. The routine must still stop
+        ; writing at max.
         ;
 
         popa

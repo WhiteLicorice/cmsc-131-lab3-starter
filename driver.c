@@ -1,11 +1,11 @@
 /*
  * rengrep - a working subset of grep. Provided to the group. Do not modify.
  *
- * This file reads the file, parses flags, builds the line index, and writes
- * output. Everything that touches a byte of the text is your assembly: the
- * three routines below. Your defense will use this copy, so what it prints
- * and the structs it passes are the contract. Read this file before writing
- * assembly.
+ * This file reads the file, calls your parser, builds the line index, and
+ * writes output. Everything that touches a byte of the text or of argv is
+ * your assembly: the four routines below. Your defense will use this copy,
+ * so what it prints and the structs it passes are the contract. Read this
+ * file before writing assembly.
  *
  * Correctness is defined by agreement with the installed grep, byte for
  * byte. run_tests.sh runs both and diffs them. There is no expected-output
@@ -51,7 +51,8 @@ int PRE_CDECL index_lines(char *buf, int len, struct line *out, int max) POST_CD
  *
  * A match is a whole word when the character before it and the character
  * after it are both non-word characters or absent. Word characters are
- * A-Z, a-z, 0-9, and _. A pattern longer than the line cannot match.
+ * A-Z, a-z, 0-9, and _. A pattern longer than the line cannot match. An
+ * empty pattern matches at every position, as it does in grep.
  */
 int PRE_CDECL line_matches(char *line, int linelen,
                            char *pat, int patlen,
@@ -63,15 +64,36 @@ int PRE_CDECL line_matches(char *line, int linelen,
  */
 int PRE_CDECL int_to_dec(int n, char *out) POST_CDECL;
 
+/*
+ * Parse argv into out.
+ *
+ *   argc, argv - as main received them. argv[0] is the program name.
+ *   out        - the parsed result
+ *
+ * A token whose first byte is '-' and whose second byte is not NUL is a
+ * flag group, wherever it appears. -nvi is -n -v -i. Every other token is
+ * positional. The first positional is the pattern, the second is the file.
+ *
+ * out->flags is the OR of the FLAG_ bits below. Return 0 on success.
+ * Return -1 when the pattern or the file is missing, or a third positional
+ * appears. Return the offending character, as a positive int, on an
+ * unknown flag.
+ */
+#define FLAG_N 1
+#define FLAG_C 2
+#define FLAG_V 4
+#define FLAG_I 8
+#define FLAG_W 16
+struct args {
+    int flags;
+    char *pattern;
+    char *path;
+};
+int PRE_CDECL parse_args(int argc, char **argv, struct args *out) POST_CDECL;
+
 /* ------------------------------------------------------------------ */
 /* The rest is driver. Read it for the output format, not to change.  */
 /* ------------------------------------------------------------------ */
-
-static int is_word_char(char c)
-{
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-           (c >= '0' && c <= '9') || c == '_';
-}
 
 static char *read_file(const char *path, int *len_out)
 {
@@ -97,37 +119,25 @@ static char *read_file(const char *path, int *len_out)
 
 int main(int argc, char **argv)
 {
-    int fold = 0, whole = 0, num = 0, count = 0, invert = 0;
-    const char *pat = NULL, *path = NULL;
+    struct args a;
     int i;
 
-    for (i = 1; i < argc; i++) {
-        const char *a = argv[i];
-        if (a[0] == '-' && a[1] != '\0' && pat == NULL) {
-            /* Combined short flags: -nvi is -n -v -i. */
-            for (const char *p = a + 1; *p; p++) {
-                switch (*p) {
-                case 'n': num = 1; break;
-                case 'c': count = 1; break;
-                case 'v': invert = 1; break;
-                case 'i': fold = 1; break;
-                case 'w': whole = 1; break;
-                default:
-                    fprintf(stderr, "rengrep: unknown flag -%c\n", *p);
-                    return 2;
-                }
-            }
-        } else if (pat == NULL) {
-            pat = a;
-        } else {
-            path = a;
-        }
+    int r = parse_args(argc, argv, &a);
+    if (r > 0) {
+        fprintf(stderr, "rengrep: unknown flag -%c\n", r);
+        return 2;
     }
-
-    if (!pat || !path) {
+    if (r < 0) {
         fprintf(stderr, "usage: rengrep [flags] PATTERN FILE\n");
         return 2;
     }
+
+    int num    = (a.flags & FLAG_N) != 0;
+    int count  = (a.flags & FLAG_C) != 0;
+    int invert = (a.flags & FLAG_V) != 0;
+    int fold   = (a.flags & FLAG_I) != 0;
+    int whole  = (a.flags & FLAG_W) != 0;
+    const char *pat = a.pattern, *path = a.path;
 
     int len;
     char *buf = read_file(path, &len);

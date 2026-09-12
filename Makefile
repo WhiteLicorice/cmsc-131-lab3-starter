@@ -76,17 +76,18 @@ CFLAGS := -m32
 #   make test       alias for check
 #   make clean      delete build output
 #
-# Three separately assembled modules, linked together with the C driver.
+# Four separately assembled modules, linked together with the C driver.
 # The multi-module split is part of the activity's requirements.
 
 BIN  := rengrep$(EXE)
-OBJS := driver.o match.obj lines.obj fmt.obj
+OBJS := driver.o args.obj match.obj lines.obj fmt.obj
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 driver.o: driver.c cdecl.h
 
+args.obj: args.asm
 match.obj: match.asm
 lines.obj: lines.asm
 fmt.obj: fmt.asm

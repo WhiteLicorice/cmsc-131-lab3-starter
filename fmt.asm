@@ -29,7 +29,7 @@
 ;   * Preserve ebx, esi, edi, and ebp. Return the byte count in eax.
 ;   * No calls into the C standard library.
 ;
-; The manual's shape:
+; The manual's loop:
 ;
 ;       mov ebx, 10
 ;       xor ecx, ecx              ; digit count
@@ -43,8 +43,8 @@
 ;       jne digit_loop
 ;       ; now pop ecx digits into edi in the right order
 ;
-; (line numbers here never go negative, but int_to_dec must still handle
-; n == 0 correctly, and the driver never passes negatives.)
+; The driver never passes a negative. It does pass 0, for -c on a file
+; with no matching line, and int_to_dec must print that as one digit.
 ;
 
 ; Windows C puts a leading underscore on every exported name. Linux C does
@@ -66,7 +66,7 @@ _int_to_dec:
         ;
         ; TODO: convert.
         ;
-        ; The shape above is the manual's. Your job is to make it write
+        ; The loop above is the manual's. Your job is to make it write
         ; into out (which is [ebp+12]) and return the digit count in eax.
         ; The pop loop writes one byte per digit to out[0..count-1].
         ;

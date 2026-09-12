@@ -33,10 +33,15 @@
 ;   * whole: a match counts only when the byte before the match and the
 ;     byte after it are both non-word characters or absent. A failed
 ;     word-boundary check does NOT end the search. Keep scanning.
-;   * The search bound is linelen - patlen, NOT linelen. Compared with a
-;     signed jump, because when patlen > linelen the difference is negative
-;     and an unsigned jump would loop about four billion times. This is the
-;     Block 5 lesson.
+;   * The search bound is linelen - patlen, not linelen. Compare it with a
+;     signed jump. When patlen is larger than linelen the difference is
+;     negative. An unsigned jump reads it as enormous, and the scan runs
+;     off the line into memory the process does not own and faults. This
+;     is the Block 5 lesson.
+;   * An empty pattern matches at every position, as it does in grep. A
+;     rep prefix with ecx = 0 executes nothing and leaves the flags as they
+;     were, so set ZF yourself before repe cmpsb. A bottom-tested folding
+;     loop needs its own guard.
 ;   * Set cld explicitly. The direction flag persists across calls and
 ;     assuming it is clear is how a routine that works alone breaks when
 ;     called after something else.
@@ -65,7 +70,7 @@ _line_matches:
         ;
         ; TODO: search.
         ;
-        ; The shape the manual describes:
+        ; The loop the manual describes:
         ;
         ;   for start = 0 to linelen - patlen:
         ;       compare patlen bytes at line+start against pat
