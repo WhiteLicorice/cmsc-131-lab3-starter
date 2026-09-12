@@ -46,11 +46,10 @@
 ; Word characters are A-Z, a-z, 0-9, and _.
 ;
 
-; Windows C decorates the names it exports with a leading underscore and
-; Linux C does not, so the same source would otherwise need two spellings of
-; every entry point. -d ELF_TYPE, which the shared Makefile fragment passes
-; on Linux, selects the respelling here. It's the same trick asm_io.inc
-; uses for _asm_main in the bootcamp blocks. Leave this block alone.
+; Windows C puts a leading underscore on every exported name. Linux C does
+; not. The Makefile passes -d ELF_TYPE on Linux. This block then respells
+; the names below to match. asm_io.inc does the same for _asm_main in the
+; bootcamp blocks. Leave this block alone.
 %ifdef ELF_TYPE
   %define _line_matches line_matches
   section .note.GNU-stack noalloc noexec nowrite progbits

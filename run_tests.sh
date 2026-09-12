@@ -35,7 +35,7 @@ failures=0
 total=0
 
 # Every single flag and every pair, across every test file. The manual says
-# "5 files by 6 flag settings and their pairs"; the patterns below cover
+# "5 files by 6 flag settings and their pairs". The patterns below cover
 # singles and all ten pairs.
 flagsets=( "" "-n" "-c" "-v" "-i" "-w"
            "-n -c" "-n -v" "-n -i" "-n -w"
