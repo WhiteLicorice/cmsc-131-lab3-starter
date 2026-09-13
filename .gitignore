@@ -2,3 +2,6 @@
 *.obj
 *.exe
 /rengrep
+/contract_test
+.grep.out
+.rengrep.out

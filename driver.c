@@ -8,10 +8,11 @@
  * file before writing assembly.
  *
  * Correctness is defined by agreement with the installed grep, byte for
- * byte. run_tests.sh runs both and diffs them. There is no expected-output
- * file to maintain.
+ * byte. run_tests.sh runs both with LC_ALL=C and -F and compares the two
+ * outputs. There is no expected-output file to maintain.
  */
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,6 +96,18 @@ int PRE_CDECL parse_args(int argc, char **argv, struct args *out) POST_CDECL;
 /* The rest is driver. Read it for the output format, not to change.  */
 /* ------------------------------------------------------------------ */
 
+/*
+ * read_file - read the whole file into a fresh buffer.
+ *
+ * Every I/O result is checked. A short read, a failed seek, and a file too
+ * large for the assembly interface are all errors rather than a smaller
+ * buffer: index_lines takes an int length and int offsets, and the line
+ * array is len + 1 entries, so a file of INT_MAX bytes or more cannot be
+ * represented at all.
+ *
+ * Returns the buffer, or NULL after printing a message. The length lands in
+ * len_out.
+ */
 static char *read_file(const char *path, int *len_out)
 {
     FILE *f = fopen(path, "rb");
@@ -102,17 +115,46 @@ static char *read_file(const char *path, int *len_out)
         fprintf(stderr, "rengrep: cannot open %s\n", path);
         return NULL;
     }
-    fseek(f, 0, SEEK_END);
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fprintf(stderr, "rengrep: %s: cannot seek\n", path);
+        fclose(f);
+        return NULL;
+    }
     long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
+    if (n < 0) {
+        fprintf(stderr, "rengrep: %s: cannot measure\n", path);
+        fclose(f);
+        return NULL;
+    }
+    if (n > (long)INT_MAX - 1) {
+        fprintf(stderr, "rengrep: %s: file is too large for this tool\n", path);
+        fclose(f);
+        return NULL;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fprintf(stderr, "rengrep: %s: cannot rewind\n", path);
+        fclose(f);
+        return NULL;
+    }
+
     char *buf = malloc(n > 0 ? (size_t)n : 1);
     if (!buf) {
         fclose(f);
         fprintf(stderr, "rengrep: out of memory\n");
         return NULL;
     }
+
     size_t got = fread(buf, 1, (size_t)n, f);
+    int bad = ferror(f);
     fclose(f);
+    if (bad || got != (size_t)n) {
+        fprintf(stderr, "rengrep: %s: expected %ld bytes, read %u\n",
+                path, n, (unsigned)got);
+        free(buf);
+        return NULL;
+    }
+
     *len_out = (int)got;
     return buf;
 }
@@ -156,6 +198,24 @@ int main(int argc, char **argv)
     int patlen = (int)strlen(pat);
 
     if (count) {
+        /*
+         * grep prints nothing at all for -c together with -v and an empty
+         * pattern, where every other -c prints a number. The count there is
+         * zero, but grep prints no "0". The tool is defined by agreement
+         * with grep, so this one case prints nothing too and exits 0.
+         *
+         * The exception has an exception. Add -w and grep prints the
+         * ordinary count, because an empty pattern matches no whole word,
+         * so every line is selected by -v. Measured on GNU grep 3.0 and
+         * 3.11. Every other count, including a zero count for an ordinary
+         * pattern, prints the number.
+         */
+        if (invert && patlen == 0 && !whole) {
+            free(lines);
+            free(buf);
+            return 0;
+        }
+
         int matched = 0;
         for (i = 0; i < nlines; i++) {
             int m = line_matches(buf + lines[i].offset, lines[i].length,

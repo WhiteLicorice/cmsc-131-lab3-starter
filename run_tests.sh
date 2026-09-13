@@ -1,20 +1,35 @@
 #!/usr/bin/env bash
 #
-# rengrep correctness gate. Correctness is agreement with the real grep,
-# byte for byte, for every flag combination on every test file.
+# rengrep correctness gate. It runs two passes.
+#
+# Pass 1, the oracle. The installed grep is the reference. Both programs run
+# with the same arguments, their stdout is captured to files, and the files
+# are compared byte for byte. The oracle is invoked as
+#
+#       LC_ALL=C grep -F $flags "$pattern" "$file"
+#
+# The C locale keeps character classes and case folding identical on every
+# machine. -F makes the pattern a fixed string, which is the subset rengrep
+# implements: a pattern such as "." matches a literal dot and not any
+# character.
+#
+# Every flag subset is tested: no flags, each of the five singles, every
+# pair, every triple, every quadruple, and all five together. That is 32
+# subsets, against 6 patterns and 5 files, or 960 comparisons.
+#
+# Pass 2, the contract. ./contract_test calls the four routines directly and
+# checks the capacity argument, the boundary rules, the formatter, the
+# parser, and the register discipline. Those are invisible to the oracle.
 #
 #       ./run_tests.sh
 #
-# Build rengrep first (make). The comparison, per the manual:
-#
-#   grep $flags "$pattern" "$file" > expected.txt
-#   ./rengrep $flags "$pattern" "$file" > actual.txt
-#   diff --strip-trailing-cr expected.txt actual.txt
-#
-# grep exits 1 when nothing matched. run_tests.sh compares output only, so
-# match the output and do not worry about exit status.
+# Build both programs first (make). Each run is captured before its text is
+# compared, and every status is read, so a crash cannot pass as a match.
+# grep exits 0 when it matched and 1 when it did not. Both are accepted.
+# grep exits 2 on an error, and that is a failure of the harness. rengrep
+# must exit 0 on every valid invocation.
 
-set -u
+set -uo pipefail
 
 bin="./rengrep"
 if [ ! -x "$bin" ] && [ -x "$bin.exe" ]; then
@@ -31,41 +46,58 @@ command -v grep >/dev/null 2>&1 || {
     exit 1
 }
 
+expected="./.grep.out"
+actual="./.rengrep.out"
+trap 'rm -f "$expected" "$actual"' EXIT
+
 failures=0
 total=0
 
-# Every single flag and every pair, across every test file. The manual says
-# "5 files by 6 flag settings and their pairs". The patterns below cover
-# singles and all ten pairs.
-flagsets=( "" "-n" "-c" "-v" "-i" "-w"
-           "-n -c" "-n -v" "-n -i" "-n -w"
-           "-c -v" "-c -i" "-c -w"
-           "-v -i" "-v -w" "-i -w" )
+# The 32 flag subsets, built from the five flags. Bit order follows the
+# FLAG_ constants in driver.c.
+flagsets=()
+for mask in $(seq 0 31); do
+    f=""
+    if [ $((mask & 1)) -ne 0 ]; then f="$f -n"; fi
+    if [ $((mask & 2)) -ne 0 ]; then f="$f -c"; fi
+    if [ $((mask & 4)) -ne 0 ]; then f="$f -v"; fi
+    if [ $((mask & 8)) -ne 0 ]; then f="$f -i"; fi
+    if [ $((mask & 16)) -ne 0 ]; then f="$f -w"; fi
+    flagsets+=("$f")
+done
 
-# Patterns: a word, a substring, and a single character, so both the fast
-# path and the folding path get exercised. Then a pattern longer than any
-# line (longlines.txt exists for that), and the empty pattern, which grep
-# matches on every line.
-patterns=( "cat" "he " "e" "The quick brown fox jumps over the lazy dog" "" )
+# Six patterns. A word, a two-character substring, a single character, a
+# sentence longer than any line, a dot (which -F makes literal), and the
+# empty pattern, which matches every line.
+patterns=( "cat" "he " "e" "The quick brown fox jumps over the lazy dog" "." "" )
 
-# One cell is skipped. grep prints nothing for -c -v "" (measured on grep
-# 3.0 and 3.11), where every other -c prints a number. rengrep prints 0
-# there, which is the count. 16 flag sets x 5 patterns x 5 files, less the
-# 5 skipped cells, is 395 comparisons.
+files=( tests/*.txt )
+
 for flags in "${flagsets[@]}"; do
     for pat in "${patterns[@]}"; do
-        for file in tests/*.txt; do
-            if [ "$flags" = "-c -v" ] && [ -z "$pat" ]; then
+        for file in "${files[@]}"; do
+            total=$((total + 1))
+
+            LC_ALL=C grep -F $flags "$pat" "$file" > "$expected" 2>/dev/null
+            gstatus=$?
+            if [ "$gstatus" -gt 1 ]; then
+                echo "FAIL  grep itself failed (status $gstatus): $flags '$pat' $file"
+                failures=$((failures + 1))
                 continue
             fi
-            total=$((total + 1))
-            # --strip-trailing-cr matters on Windows. The .exe emits \r\n,
-            # while grep's output and the test files use \n. It is harmless
+
+            "$bin" $flags "$pat" "$file" > "$actual" 2>/dev/null
+            rstatus=$?
+            if [ "$rstatus" -ne 0 ]; then
+                echo "FAIL  rengrep exited with status $rstatus: $flags '$pat' $file"
+                failures=$((failures + 1))
+                continue
+            fi
+
+            # --strip-trailing-cr matters on Windows: the .exe writes \r\n
+            # while grep and the test files use \n. It is harmless
             # everywhere else.
-            if grep $flags "$pat" "$file" 2>/dev/null | diff -q --strip-trailing-cr - \
-                <("$bin" $flags "$pat" "$file" 2>/dev/null) >/dev/null 2>&1; then
-                :
-            else
+            if ! diff -q --strip-trailing-cr "$expected" "$actual" >/dev/null; then
                 echo "FAIL  rengrep $flags '$pat' $file"
                 failures=$((failures + 1))
             fi
@@ -73,11 +105,30 @@ for flags in "${flagsets[@]}"; do
     done
 done
 
+# Pass 2: the contract test.
+testbin="./contract_test"
+if [ ! -x "$testbin" ] && [ -x "$testbin.exe" ]; then
+    testbin="$testbin.exe"
+fi
+
+if [ ! -x "$testbin" ]; then
+    echo "run_tests.sh: $testbin not found. Build it first: make" >&2
+    exit 1
+fi
+
+total=$((total + 1))
+if "$testbin"; then
+    echo "ok    contract"
+else
+    echo "FAIL  contract"
+    failures=$((failures + 1))
+fi
+
 echo
 if [ "$failures" -eq 0 ]; then
-    echo "All $total comparisons matched grep."
+    echo "All $total checks passed."
     exit 0
 else
-    echo "$failures of $total comparisons differ from grep."
+    echo "$failures of $total checks failed."
     exit 1
 fi

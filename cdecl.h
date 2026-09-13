@@ -2,17 +2,17 @@
 #define CDECL_HEADER_FILE
 
 /*
- * Define macros to specify the standard C calling convention
- * The macros are designed so that they will work with all
- * supported C/C++ compilers.
+ * Macros for the standard C calling convention.
  *
- * To use define your function prototype like this:
+ * The macros work with every C and C++ compiler this course uses.
  *
- * return_type PRE_CDECL func_name( args ) POST_CDECL;
+ * Write a function prototype in this form:
+ *
+ *   return_type PRE_CDECL func_name(args) POST_CDECL;
  *
  * For example:
  *
- * int PRE_CDECL f( int x, int y) POST_CDECL;
+ *   int PRE_CDECL f(int x, int y) POST_CDECL;
  */
 
 

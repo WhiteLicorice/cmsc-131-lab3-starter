@@ -71,35 +71,49 @@ CFLAGS := -m32
 #
 # This half names this activity's objects and targets:
 #
-#   make            build rengrep
-#   make check      build, then run ./run_tests.sh
+#   make            build rengrep and the contract test
+#   make check      build both, then run ./run_tests.sh
 #   make test       alias for check
 #   make clean      delete build output
 #
 # Four separately assembled modules, linked together with the C driver.
 # The multi-module split is part of the activity's requirements.
+#
+# contract_test and contract_regs are the provided second pass. They call
+# the four routines directly, so they can see the capacity argument, the
+# boundary rules, and a clobbered register. Neither one is yours to edit.
 
 BIN  := rengrep$(EXE)
 OBJS := driver.o args.obj match.obj lines.obj fmt.obj
 
+TESTBIN  := contract_test$(EXE)
+TESTOBJS := contract_test.o contract_regs.obj args.obj match.obj lines.obj fmt.obj
+
+# The default goal builds both programs, so a plain `make` leaves the
+# directory ready for run_tests.sh.
+all: $(BIN) $(TESTBIN)
+
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+$(TESTBIN): $(TESTOBJS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 driver.o: driver.c cdecl.h
+contract_test.o: contract_test.c cdecl.h
 
 args.obj: args.asm
 match.obj: match.asm
 lines.obj: lines.asm
 fmt.obj: fmt.asm
+contract_regs.obj: contract_regs.asm
 
-all: $(BIN)
-
-check: $(BIN)
+check: $(BIN) $(TESTBIN)
 	bash ./run_tests.sh
 
 test: check
 
 clean:
-	rm -f $(BIN) *.obj *.o
+	rm -f $(BIN) $(TESTBIN) *.obj *.o
 
 .PHONY: all check test clean

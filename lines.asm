@@ -15,7 +15,9 @@
 ;
 ;       struct line { int offset; int length; };
 ;
-; Fill out with one entry per line and return the line count.
+; Fill out with one entry per line and return the number of entries
+; written. The capacity is a hard limit: stop when out is full and return
+; what you wrote. max == 0 writes nothing and returns 0.
 ;
 ; Requirements from the manual:
 ;
