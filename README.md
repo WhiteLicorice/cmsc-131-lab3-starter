@@ -50,3 +50,68 @@ are done.
 The provided files are fixtures. The grader compares your fork against the
 starter, so an edited `driver.c`, `Makefile`, `run_tests.sh`, or `tests/`
 file shows up as a diff in the open.
+
+## Documentation
+
+The three sections at the end of this file are yours. Fill in Design Notes
+and Subsystem Ownership before the Week 1 progress report. Fill in Quirks
+and Issues before the Week 3 progress report. Each section says what it
+needs. Leave the rest of this file as it is.
+
+---
+
+## Design Notes
+
+Fill this section in before the Week 1 progress report. The syllabus asks
+for problem analysis, a solution architecture, and an estimated timeline.
+Keep each part short. Update it when the plan changes.
+
+### Problem analysis
+
+The five flags and what each one does. What the oracle is, and what
+agreement with it means for a line that matches inside a longer word.
+
+### Solution architecture
+
+How the four routines split the work. How the line index is built from
+one buffer, how the flag table dispatches, and which registers each
+routine uses.
+
+### Timeline
+
+One line per week. Name the subsystem each week finishes and the member
+who owns it.
+
+| Week | Goal | Owner |
+|---|---|---|
+| 1 | | |
+| 2 | | |
+| 3 | | |
+| 4 | Defense | |
+
+## Subsystem Ownership
+
+Fill this section in before the Week 1 progress report. The manual lists
+the three subsystems. Each member owns one. In a group of four, two members
+share one. The commit history must agree with this table.
+
+| Subsystem | Owner |
+|---|---|
+| Buffering and lines (`lines.asm`) | |
+| Matching (`match.asm`) | |
+| Formatting and flags (`fmt.asm`, `args.asm`, the tests you add) | |
+
+## Quirks and Issues
+
+Fill this section in before the Week 3 progress report. The syllabus asks
+for documentation of quirks and issues with the complete implementation.
+One entry per item. State what happens, what causes it, and what the group
+did about it.
+
+### Known issues
+
+- 
+
+### Quirks
+
+- 
