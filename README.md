@@ -30,9 +30,9 @@ runs `./run_tests.sh`, which reports each test and exits nonzero when any
 of them differ.
 
 The gate has two passes. The first runs your tool and `grep` with the same
-arguments and compares the two outputs byte for byte, across all 32 flag
-subsets, 6 patterns, and 5 files: 960 comparisons. The second is
-`contract_test`, which calls the four routines directly and checks the
+arguments and compares the two outputs byte for byte. It does that across
+all 32 flag subsets, 6 patterns, and 5 files: 960 comparisons. The second
+is `contract_test`. It calls the four routines directly. It checks the
 capacity argument, the boundary rules, the formatter, the parser, and the
 register discipline. Both passes run every time, because each one catches
 what the other cannot.
@@ -40,7 +40,7 @@ what the other cannot.
 ## Reading a First Run
 
 The assembly files ship as stubs that assemble and link as-is, so the build
-works before any code is written. Right now the parser stub exits 2 for
+works before you write any code. Right now the parser stub exits 2 for
 every command. The gate requires exit 0 for a valid invocation, so all
 961 checks fail. That red run is the correct starting state for a starter.
 Expect the first passing cells once `args.asm` and `lines.asm` are in
@@ -48,13 +48,13 @@ place, and the badge turns green when the matching and formatting routines
 are done.
 
 The provided files are fixtures. The grader compares your fork against the
-starter, so an edited `driver.c`, `Makefile`, `run_tests.sh`, or `tests/`
-file shows up as a diff in the open.
+starter. An edit to `driver.c`, `Makefile`, `run_tests.sh`, or a `tests/`
+file appears as a diff in the open.
 
 ## Documentation
 
-The three sections at the end of this file are yours. Fill in Design Notes
-and Subsystem Ownership before the Week 1 progress report. Fill in Quirks
+The three sections at the end of this file are yours. Complete Design Notes
+and Subsystem Ownership before the Week 1 progress report. Complete Quirks
 and Issues before the Week 3 progress report. Each section says what it
 needs. Leave the rest of this file as it is.
 
@@ -62,7 +62,7 @@ needs. Leave the rest of this file as it is.
 
 ## Design Notes
 
-Fill this section in before the Week 1 progress report. The syllabus asks
+Complete this section before the Week 1 progress report. The syllabus asks
 for problem analysis, a solution architecture, and an estimated timeline.
 Keep each part short. Update it when the plan changes.
 
@@ -91,7 +91,7 @@ who owns it.
 
 ## Subsystem Ownership
 
-Fill this section in before the Week 1 progress report. The manual lists
+Complete this section before the Week 1 progress report. The manual lists
 the three subsystems. Each member owns one. In a group of four, two members
 share one. The commit history must agree with this table.
 
@@ -103,7 +103,7 @@ share one. The commit history must agree with this table.
 
 ## Quirks and Issues
 
-Fill this section in before the Week 3 progress report. The syllabus asks
+Complete this section before the Week 3 progress report. The syllabus asks
 for documentation of quirks and issues with the complete implementation.
 One entry per item. State what happens, what causes it, and what the group
 did about it.

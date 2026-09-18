@@ -77,7 +77,7 @@ static void check_lines(const char *name, char *buf, int len, int max,
     struct line out[8];
     int i;
 
-    /* A sentinel pattern, so a write past the capacity shows up. */
+    /* A sentinel pattern, so a write past the capacity is visible. */
     for (i = 0; i < 8; i++) {
         out[i].offset = 0x7F7F7F7F;
         out[i].length = 0x7F7F7F7F;
@@ -191,7 +191,7 @@ static void matches_checks(void)
     match("line_matches underscore before", "cat_", 4, "cat", 3, 0, 1, 0);
     match("line_matches punctuation after", "cat.", 4, "cat", 3, 0, 1, 1);
 
-    /* The buffer must come back unchanged, whatever the flags. */
+    /* The buffer must return unchanged, whatever the flags. */
     {
         char scratch[] = "The Cat Ran";
         char before[12];
