@@ -15,7 +15,7 @@
 #
 # Every flag subset is tested: no flags, each of the five singles, every
 # pair, every triple, every quadruple, and all five together. That is 32
-# subsets, against 6 patterns and 5 files, or 960 comparisons.
+# subsets, against 7 patterns and 6 files, or 1344 comparisons.
 #
 # Pass 2, the contract. ./contract_test calls the four routines directly and
 # checks the capacity argument, the boundary rules, the formatter, the
@@ -66,10 +66,10 @@ for mask in $(seq 0 31); do
     flagsets+=("$f")
 done
 
-# Six patterns. A word, a two-character substring, a single character, a
-# sentence longer than any line, a dot (which -F makes literal), and the
-# empty pattern, which matches every line.
-patterns=( "cat" "he " "e" "The quick brown fox jumps over the lazy dog" "." "" )
+# Seven patterns. A word, its capitalised form, a two-character substring,
+# a single character, a sentence longer than any line, a dot (which -F makes
+# literal), and the empty pattern, which matches every line.
+patterns=( "cat" "Cat" "he " "e" "The quick brown fox jumps over the lazy dog" "." "" )
 
 files=( tests/*.txt )
 

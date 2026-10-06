@@ -119,6 +119,7 @@ static void lines_checks(void)
     static const struct line trailing[2] = { {0, 1}, {2, 1} };
     static const struct line blank[1] = { {0, 0} };
     static const struct line one[1] = { {0, 3} };
+    static const struct line first[1] = { {0, 1} };
     static const struct line zero[1] = { {0, 0} };
 
     check_lines("index_lines empty buffer", "", 0, 8, 0, NULL);
@@ -127,6 +128,7 @@ static void lines_checks(void)
     check_lines("index_lines one blank line", "\n", 1, 8, 1, blank);
     check_lines("index_lines no newline at all", "abc", 3, 8, 1, one);
     check_lines("index_lines capacity zero", "a\nb\n", 4, 0, 0, NULL);
+    check_lines("index_lines capacity one on a final unterminated line", "a\nb", 3, 1, 1, first);
 
     /* The canary: capacity two, three lines in the buffer. */
     {
@@ -184,6 +186,7 @@ static void matches_checks(void)
     match("line_matches empty pattern with -w on a line", "a b", 3, "", 0, 0, 1, 0);
     match("line_matches folding", "The Cat Ran", 11, "cat", 3, 1, 0, 1);
     match("line_matches without folding", "The Cat Ran", 11, "cat", 3, 0, 0, 0);
+    match("line_matches nonzero fold other than one", "CAT", 3, "cat", 3, 2, 0, 1);
     match("line_matches whole word inside a word", "concatenate", 11, "cat", 3, 0, 1, 0);
     match("line_matches whole word standalone", line, 11, "cat", 3, 0, 1, 1);
     match("line_matches whole line", "cat", 3, "cat", 3, 0, 1, 1);
