@@ -323,6 +323,11 @@ static void matches_checks(void)
     /* linelen ends the line, also when its storage holds more bytes. */
     match("line_matches whole word at linelen, not at a NUL", "catX", 3, "cat", 3, 0, 1, 1);
     match("line_matches folding whole word at linelen, not at a NUL", "CATX", 3, "cat", 3, 1, 1, 1);
+    /* linelen bounds the search, also when the storage holds a match after it. */
+    match("line_matches search stops at linelen", "dog cat", 3, "cat", 3, 0, 0, 0);
+    match("line_matches folding search stops at linelen", "dog CAT", 3, "cat", 3, 1, 0, 0);
+    match("line_matches whole word search stops at linelen", "dog cat", 3, "cat", 3, 0, 1, 0);
+    match("line_matches folding whole word search stops at linelen", "dog CAT", 3, "cat", 3, 1, 1, 0);
     {
         static char big[65539];
         memset(big, 'x', sizeof big);
