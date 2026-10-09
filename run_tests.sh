@@ -30,7 +30,8 @@
 # it from there. Only the first run starts grep 1344 times, so it takes the
 # longest. The script makes the cache again when the installed grep, this
 # script, a test file, or a saved output changes. When one of them changes
-# during a run, the script runs the tests again with grep.
+# during a run that reads the cache, the script runs the tests again with
+# grep.
 #
 # grep exits 0 when it matched and 1 when it did not. Both are accepted.
 # grep exits 2 on an error, and that is a failure of the harness. rengrep
