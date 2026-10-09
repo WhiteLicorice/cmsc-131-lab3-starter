@@ -3,5 +3,5 @@
 *.exe
 /rengrep
 /contract_test
-.grep.out
+/.grep-cache/
 .rengrep.out

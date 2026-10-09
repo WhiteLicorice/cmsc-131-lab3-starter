@@ -37,6 +37,10 @@ make check
 runs `./run_tests.sh`, which reports each test and exits nonzero when any
 of them differ.
 
+The first `make check` takes the longest, often more than a minute on
+Windows. It saves the output of your installed `grep` in `.grep-cache`, and
+later runs read that saved output.
+
 The gate has two passes. The first runs your tool and `grep` with the same
 arguments and compares the two outputs byte for byte. It does that across
 all 32 flag subsets, 7 patterns, and 6 files: 1344 comparisons. The second

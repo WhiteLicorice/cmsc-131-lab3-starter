@@ -25,6 +25,11 @@
 #
 # Build both programs first (make). Each run is captured before its text is
 # compared, and every status is read, so a crash cannot pass as a match.
+#
+# The first run saves each grep output in .grep-cache, and later runs read
+# it from there. Only the first run starts grep 1344 times, so it takes the
+# longest. The script makes the cache again when the installed grep, this
+# script, or a test file changes.
 # grep exits 0 when it matched and 1 when it did not. Both are accepted.
 # grep exits 2 on an error, and that is a failure of the harness. rengrep
 # must exit 0 on every valid invocation.
@@ -46,9 +51,22 @@ command -v grep >/dev/null 2>&1 || {
     exit 1
 }
 
-expected="./.grep.out"
 actual="./.rengrep.out"
-trap 'rm -f "$expected" "$actual"' EXIT
+trap 'rm -f "$actual"' EXIT
+
+# Read the file $2 into the variable named $1, with no new process. A shell
+# variable cannot hold a NUL byte, so each NUL becomes the byte \001 and
+# still counts. A CR before a newline is dropped, as
+# diff --strip-trailing-cr drops it. The .exe on Windows writes \r\n, and
+# grep and the test files write \n.
+slurp() {
+    local part="" text=""
+    while IFS= read -r -d '' part; do
+        text+="$part"$'\001'
+    done < "$2"
+    text+="$part"
+    printf -v "$1" '%s' "${text//$'\r\n'/$'\n'}"
+}
 
 failures=0
 total=0
@@ -73,17 +91,52 @@ patterns=( "cat" "Cat" "he " "e" "The quick brown fox jumps over the lazy dog" "
 
 files=( tests/*.txt )
 
+# The cache is current when its stamp names the installed grep and the test
+# files, and nothing it depends on is newer than the stamp. Each saved output
+# is numbered by its comparison, so an added or removed test file changes
+# the numbers. GitHub Actions sets CI. There the script always runs grep, so
+# a saved output committed to the repository cannot stand in for grep.
+cache="./.grep-cache"
+stamp="$cache/stamp"
+grep_version="$(LC_ALL=C grep --version 2>/dev/null | head -n 1)"
+want_stamp="$grep_version"$'\n'"${files[*]}"$'\n'
+cached=0
+if [ -z "${CI:-}" ] && [ -f "$stamp" ]; then
+    slurp have "$stamp"
+    if [ "$have" = "$want_stamp" ]; then
+        cached=1
+        for dep in "$0" "${files[@]}"; do
+            if [ "$dep" -nt "$stamp" ]; then
+                cached=0
+            fi
+        done
+    fi
+fi
+if [ "$cached" -eq 0 ]; then
+    rm -rf "$cache"
+    mkdir -p "$cache"
+    echo "Saving the output of the installed grep in $cache."
+    echo "This first run takes the longest. Later runs read the saved output."
+    echo
+fi
+grep_failed=0
+
 for flags in "${flagsets[@]}"; do
     for pat in "${patterns[@]}"; do
         for file in "${files[@]}"; do
             total=$((total + 1))
+            expected="$cache/$total.out"
 
-            LC_ALL=C grep -F $flags "$pat" "$file" > "$expected" 2>/dev/null
-            gstatus=$?
-            if [ "$gstatus" -gt 1 ]; then
-                echo "FAIL  grep itself failed (status $gstatus): $flags '$pat' $file"
-                failures=$((failures + 1))
-                continue
+            if [ "$cached" -eq 0 ] || [ ! -f "$expected" ]; then
+                LC_ALL=C grep -F $flags "$pat" "$file" > "$expected" 2>/dev/null
+                gstatus=$?
+                if [ "$gstatus" -gt 1 ]; then
+                    rm -f "$expected"
+                    grep_failed=1
+                    echo "FAIL  grep itself failed (status $gstatus): $flags '$pat' $file"
+                    failures=$((failures + 1))
+                    continue
+                fi
             fi
 
             "$bin" $flags "$pat" "$file" > "$actual" 2>/dev/null
@@ -94,16 +147,22 @@ for flags in "${flagsets[@]}"; do
                 continue
             fi
 
-            # --strip-trailing-cr matters on Windows: the .exe writes \r\n
-            # while grep and the test files use \n. It is harmless
-            # everywhere else.
-            if ! diff -q --strip-trailing-cr "$expected" "$actual" >/dev/null; then
+            # Compare in the shell. A diff process for each comparison is
+            # the slowest step under Git Bash on Windows.
+            slurp want "$expected"
+            slurp got "$actual"
+            if [[ "$got" != "$want" ]]; then
                 echo "FAIL  rengrep $flags '$pat' $file"
                 failures=$((failures + 1))
             fi
         done
     done
 done
+
+# Write the stamp only after every grep output is saved.
+if [ "$cached" -eq 0 ] && [ "$grep_failed" -eq 0 ]; then
+    printf '%s' "$want_stamp" > "$stamp"
+fi
 
 # Pass 2: the contract test.
 testbin="./contract_test"
