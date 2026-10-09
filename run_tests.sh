@@ -27,11 +27,12 @@
 # compared, and every status is read, so a crash cannot pass as a match.
 #
 # The first run saves each grep output in .grep-cache, and later runs read
-# it from there. Only the first run starts grep 1344 times, so it takes the
-# longest. The script makes the cache again when the installed grep, this
-# script, a test file, or a saved output changes. When one of them changes
-# during a run that reads the cache, the script runs the tests again with
-# grep.
+# it from there. A run that does not read the cache starts grep 1344 times,
+# so it takes the longest. That is the first run, the run after a change,
+# and every run in CI. The script makes the cache again when the installed
+# grep, this script, a test file, or a saved output changes. When one of
+# them changes during a run that reads the cache, the script runs the tests
+# again with grep.
 #
 # grep exits 0 when it matched and 1 when it did not. Both are accepted.
 # grep exits 2 on an error, and that is a failure of the harness. rengrep
@@ -125,7 +126,10 @@ if [ "$cached" -eq 0 ]; then
     rm -rf "$cache"
     mkdir -p "$cache"
     echo "Saving the output of the installed grep in $cache."
-    echo "This first run takes the longest. Later runs read the saved output."
+    echo "This run starts grep $cells times, so it takes the longest."
+    if [ -z "${CI:-}" ]; then
+        echo "Later runs read the saved output."
+    fi
     echo
 fi
 grep_failed=0

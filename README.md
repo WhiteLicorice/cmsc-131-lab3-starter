@@ -39,7 +39,8 @@ of them differ.
 
 The first `make check` takes the longest, often more than a minute on
 Windows. It saves the output of your installed `grep` in `.grep-cache`, and
-later runs read that saved output.
+later runs read that saved output. A change to your `grep`, `run_tests.sh`,
+or a test file makes the next run save the output again.
 
 The gate has two passes. The first runs your tool and `grep` with the same
 arguments and compares the two outputs byte for byte. It does that across
