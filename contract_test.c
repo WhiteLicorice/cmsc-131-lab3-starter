@@ -187,10 +187,14 @@ static void matches_checks(void)
     match("line_matches folding", "The Cat Ran", 11, "cat", 3, 1, 0, 1);
     match("line_matches without folding", "The Cat Ran", 11, "cat", 3, 0, 0, 0);
     match("line_matches nonzero fold other than one", "CAT", 3, "cat", 3, 2, 0, 1);
+    /* '[' and '{' differ only in bit 5. Folding changes letters only. */
+    match("line_matches folding leaves a bracket in the line", "[", 1, "{", 1, 1, 0, 0);
+    match("line_matches folding leaves a bracket in the pattern", "{", 1, "[", 1, 1, 0, 0);
     match("line_matches whole word inside a word", "concatenate", 11, "cat", 3, 0, 1, 0);
     match("line_matches whole word standalone", line, 11, "cat", 3, 0, 1, 1);
     match("line_matches whole line", "cat", 3, "cat", 3, 0, 1, 1);
     match("line_matches word character before", "xcat", 4, "cat", 3, 0, 1, 0);
+    match("line_matches nonzero whole other than one", "xcat", 4, "cat", 3, 0, 2, 0);
     match("line_matches underscore after", "cat_", 4, "cat", 3, 0, 1, 0);
     match("line_matches underscore before", "_cat", 4, "cat", 3, 0, 1, 0);
     match("line_matches punctuation after", "cat.", 4, "cat", 3, 0, 1, 1);
