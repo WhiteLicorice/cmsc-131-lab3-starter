@@ -71,14 +71,16 @@ static void fail(const char *name, const char *detail)
 
 /* --- index_lines ---------------------------------------------------- */
 
-static void check_lines(const char *name, char *buf, int len, int max,
-                        int want_count, const struct line *want)
+/* Run one index_lines call and compare. Report a failure and return 0, or
+   return 1. out holds n entries. Entries past the wanted count must stay
+   at the sentinel. */
+static int run_lines(const char *name, const char *how, char *buf, int len, int max,
+                     int want_count, const struct line *want, struct line *out, int n)
 {
-    struct line out[8];
     int i;
 
     /* A sentinel pattern, so a write past the capacity is visible. */
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < n; i++) {
         out[i].offset = 0x7F7F7F7F;
         out[i].length = 0x7F7F7F7F;
     }
@@ -86,29 +88,83 @@ static void check_lines(const char *name, char *buf, int len, int max,
     int got = index_lines(buf, len, out, max);
 
     if (got != want_count) {
-        char detail[96];
-        snprintf(detail, sizeof detail, "returned %d, wanted %d", got, want_count);
+        char detail[128];
+        snprintf(detail, sizeof detail, "%s: returned %d, wanted %d", how, got, want_count);
         fail(name, detail);
-        return;
+        return 0;
     }
-    for (i = 0; i < want_count && i < 8; i++) {
+    for (i = 0; i < want_count && i < n; i++) {
         if (out[i].offset != want[i].offset || out[i].length != want[i].length) {
-            char detail[128];
+            char detail[160];
             snprintf(detail, sizeof detail,
-                     "entry %d is {%d,%d}, wanted {%d,%d}",
-                     i, out[i].offset, out[i].length, want[i].offset, want[i].length);
+                     "%s: entry %d is {%d,%d}, wanted {%d,%d}",
+                     how, i, out[i].offset, out[i].length, want[i].offset, want[i].length);
             fail(name, detail);
-            return;
+            return 0;
         }
     }
-    for (i = want_count; i < 8; i++) {
+    for (i = want_count; i < n; i++) {
         if (out[i].offset != 0x7F7F7F7F || out[i].length != 0x7F7F7F7F) {
-            char detail[128];
+            char detail[160];
             snprintf(detail, sizeof detail,
-                     "wrote entry %d past the capacity of %d", i, max);
+                     "%s: wrote entry %d past the capacity of %d", how, i, max);
             fail(name, detail);
-            return;
+            return 0;
         }
+    }
+    return 1;
+}
+
+/* Each small case also runs in wide forms. When the capacity is above the
+   wanted count, the case runs again with a capacity of 65536, and again
+   padded with 'x' to a length of exactly 65536. The case also runs after a
+   first line of 65536 bytes. len and max then pass the low word on every
+   path. */
+static void check_lines(const char *name, char *buf, int len, int max,
+                        int want_count, const struct line *want)
+{
+    static struct line wide_out[65537];
+    static char wide_buf[65537 + 4096];
+    struct line out[8];
+    struct line wide_want[9];
+    int i;
+
+    if (!run_lines(name, "as given", buf, len, max, want_count, want, out, 8))
+        return;
+    if (len <= 4096 && want_count <= 8) {
+        if (want_count > 0 && max > want_count
+            && !run_lines(name, "capacity 65536", buf, len, 65536, want_count, want, wide_out, 16))
+            return;
+        if (max > want_count) {
+            int pad = 65536 - len;
+            int n = want_count;
+            memcpy(wide_buf, buf, len);
+            memset(wide_buf + len, 'x', pad);
+            for (i = 0; i < want_count; i++)
+                wide_want[i] = want[i];
+            if (len > 0 && buf[len - 1] != '\n') {
+                wide_want[n - 1].length += pad;
+            } else {
+                wide_want[n].offset = len;
+                wide_want[n].length = pad;
+                n++;
+            }
+            if (!run_lines(name, "padded to 65536 bytes", wide_buf, 65536, max + 1,
+                           n, wide_want, wide_out, 16))
+                return;
+        }
+        memset(wide_buf, 'x', 65536);
+        wide_buf[65536] = '\n';
+        memcpy(wide_buf + 65537, buf, len);
+        wide_want[0].offset = 0;
+        wide_want[0].length = 65536;
+        for (i = 0; i < want_count; i++) {
+            wide_want[i + 1].offset = want[i].offset + 65537;
+            wide_want[i + 1].length = want[i].length;
+        }
+        if (!run_lines(name, "after a 65536-byte line", wide_buf, len + 65537, max + 1,
+                       want_count + 1, wide_want, wide_out, 16))
+            return;
     }
     ok(name);
 }
@@ -176,17 +232,50 @@ static void lines_checks(void)
 
 /* --- line_matches --------------------------------------------------- */
 
+/* Run one line_matches call and compare. Report a failure and return 0, or
+   return 1. */
+static int match_once(const char *name, const char *how, char *line, int linelen,
+                      char *pat, int patlen, int fold, int whole, int want)
+{
+    int got = line_matches(line, linelen, pat, patlen, fold, whole);
+    if (got == want)
+        return 1;
+    char detail[128];
+    snprintf(detail, sizeof detail, "%s: returned %d, wanted %d", how, got, want);
+    fail(name, detail);
+    return 0;
+}
+
+/* Each case also runs in wide forms. A nonzero flag runs again as each
+   one-bit value and as -1. When the pattern has no space, the case runs
+   again after 65536 leading spaces. A space is not a word character, so the
+   result stays the same. */
 static void match(const char *name, char *line, int linelen, char *pat, int patlen,
                   int fold, int whole, int want)
 {
-    int got = line_matches(line, linelen, pat, patlen, fold, whole);
-    if (got == want) {
-        ok(name);
-    } else {
-        char detail[96];
-        snprintf(detail, sizeof detail, "returned %d, wanted %d", got, want);
-        fail(name, detail);
+    static char wide[65536 + 4096];
+    char how[48];
+    int k;
+
+    if (!match_once(name, "as given", line, linelen, pat, patlen, fold, whole, want))
+        return;
+    for (k = 0; k <= 32; k++) {
+        int v = k < 32 ? (int)(1u << k) : -1;
+        snprintf(how, sizeof how, "fold %d", v);
+        if (fold && !match_once(name, how, line, linelen, pat, patlen, v, whole, want))
+            return;
+        snprintf(how, sizeof how, "whole %d", v);
+        if (whole && !match_once(name, how, line, linelen, pat, patlen, fold, v, want))
+            return;
     }
+    if (patlen > 0 && linelen <= 4096 && memchr(pat, ' ', patlen) == NULL) {
+        memset(wide, ' ', 65536);
+        memcpy(wide + 65536, line, linelen);
+        if (!match_once(name, "after 65536 spaces", wide, 65536 + linelen,
+                        pat, patlen, fold, whole, want))
+            return;
+    }
+    ok(name);
 }
 
 static void matches_checks(void)
@@ -230,10 +319,28 @@ static void matches_checks(void)
         memcpy(big + 65533, "cat", 3);
         big[65536] = 0;
         match("line_matches line past the low word", big, 65536, "cat", 3, 0, 0, 1);
+        match("line_matches folding line past the low word", big, 65536, "CAT", 3, 1, 0, 1);
         big[0] = 'a';
         match("line_matches pattern past the low word", "a", 1, big, 65536, 0, 0, 0);
+        match("line_matches folding pattern past the low word", "a", 1, big, 65536, 1, 0, 0);
     }
-    /* Equal lengths past the low word. Both paths compare every byte. */
+    /* A whole match of a 65536-byte pattern. The boundary check reads the byte
+       after the pattern, at offset 65536. */
+    {
+        static char qline[65539];
+        static char qpat[65537];
+        memset(qline, 'q', 65536);
+        qline[65536] = ' ';
+        qline[65537] = 'z';
+        memset(qpat, 'q', 65536);
+        match("line_matches whole pattern past the low word", qline, 65538, qpat, 65536, 0, 1, 1);
+        match("line_matches folding whole pattern past the low word", qline, 65538, qpat, 65536, 1, 1, 1);
+        /* The storage holds the pattern, but the stated line is one byte. */
+        match("line_matches pattern past the low word over a short line", qline, 1, qpat, 65536, 0, 0, 0);
+        match("line_matches folding pattern past the low word over a short line", qline, 1, qpat, 65536, 1, 0, 0);
+    }
+    /* Both lengths are 65536. A count cut to 16 bits is zero, so a routine
+       that cuts it compares no bytes and reports a match. */
     {
         static char line_a[65537];
         static char pat_b[65537];
@@ -245,6 +352,10 @@ static void matches_checks(void)
     match("line_matches underscore after", "cat_", 4, "cat", 3, 0, 1, 0);
     match("line_matches underscore before", "_cat", 4, "cat", 3, 0, 1, 0);
     match("line_matches punctuation after", "cat.", 4, "cat", 3, 0, 1, 1);
+    match("line_matches folding whole word standalone", "The CAT sat", 11, "cat", 3, 1, 1, 1);
+    match("line_matches folding word character before", "XCAT", 4, "cat", 3, 1, 1, 0);
+    match("line_matches folding underscore after", "CAT_", 4, "cat", 3, 1, 1, 0);
+    match("line_matches folding punctuation after", "CAT.", 4, "cat", 3, 1, 1, 1);
 
     /* The buffer must return unchanged, whatever the flags. */
     {
@@ -386,6 +497,18 @@ static void parse_checks(void)
         many[256] = "f";
         many[257] = NULL;
         parse_one("parse_args argc past the low byte", 257, many, 0, FLAG_N, "cat", "f");
+    }
+    /* argc is a full int past the low word too. */
+    {
+        static char *wide[65538];
+        int i;
+        wide[0] = "rengrep";
+        for (i = 1; i < 65535; i++)
+            wide[i] = "-n";
+        wide[65535] = "cat";
+        wide[65536] = "f";
+        wide[65537] = NULL;
+        parse_one("parse_args argc past the low word", 65537, wide, 0, FLAG_N, "cat", "f");
     }
 }
 
