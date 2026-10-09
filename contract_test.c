@@ -313,6 +313,11 @@ static void matches_checks(void)
     /* The lengths are full ints. patlen gives the pattern bytes to compare. */
     match("line_matches compares patlen bytes, not up to a NUL", "cat", 3, "cats", 3, 0, 0, 1);
     match("line_matches folding compares patlen bytes, not up to a NUL", "CAT", 3, "cats", 3, 1, 0, 1);
+    /* The boundary check uses patlen too, on both sides of the match. */
+    match("line_matches whole word before, patlen not up to a NUL", "xcat", 4, "cats", 3, 0, 1, 0);
+    match("line_matches folding whole word before, patlen not up to a NUL", "XCAT", 4, "cats", 3, 1, 1, 0);
+    match("line_matches whole word after, patlen not up to a NUL", "cat_", 4, "cats", 3, 0, 1, 0);
+    match("line_matches whole word match, patlen not up to a NUL", "cat x", 5, "cats", 3, 0, 1, 1);
     {
         static char big[65539];
         memset(big, 'x', sizeof big);
@@ -324,8 +329,8 @@ static void matches_checks(void)
         match("line_matches pattern past the low word", "a", 1, big, 65536, 0, 0, 0);
         match("line_matches folding pattern past the low word", "a", 1, big, 65536, 1, 0, 0);
     }
-    /* A whole match of a 65536-byte pattern. The boundary check reads the byte
-       after the pattern, at offset 65536. */
+    /* These cases make a whole match of a 65536-byte pattern. The boundary
+       check reads the byte after the pattern, at offset 65536. */
     {
         static char qline[65539];
         static char qpat[65537];
