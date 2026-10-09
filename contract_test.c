@@ -155,6 +155,23 @@ static void lines_checks(void)
 
     check_lines("index_lines blank line is one entry", "x\n\ny\n", 5, 8, 3,
                 (const struct line[]) { {0, 1}, {2, 0}, {3, 1} });
+
+    /* len and max are full ints. The routine reads len bytes and stops there. */
+    check_lines("index_lines reads len bytes, not up to a NUL", "abcEXTRA", 3, 8, 1, one);
+    {
+        static struct line roomy[65536];
+        int got = index_lines("abc", 3, roomy, 65536);
+        if (got == 1 && roomy[0].offset == 0 && roomy[0].length == 3)
+            ok("index_lines capacity past the low word");
+        else
+            fail("index_lines capacity past the low word", "capacity 65536 did not give one entry");
+    }
+    {
+        static char big[65537];
+        static const struct line want[1] = { {0, 65536} };
+        memset(big, 'x', 65536);
+        check_lines("index_lines length past the low word", big, 65536, 8, 1, want);
+    }
 }
 
 /* --- line_matches --------------------------------------------------- */
@@ -195,6 +212,24 @@ static void matches_checks(void)
     match("line_matches whole line", "cat", 3, "cat", 3, 0, 1, 1);
     match("line_matches word character before", "xcat", 4, "cat", 3, 0, 1, 0);
     match("line_matches nonzero whole other than one", "xcat", 4, "cat", 3, 0, 2, 0);
+    /* Any nonzero int sets a flag, also when its low byte is zero. */
+    match("line_matches fold flag of 256", "CAT", 3, "cat", 3, 256, 0, 1);
+    match("line_matches fold flag of 65536", "CAT", 3, "cat", 3, 65536, 0, 1);
+    match("line_matches fold flag of -1", "CAT", 3, "cat", 3, -1, 0, 1);
+    match("line_matches whole flag of 256", "xcat", 4, "cat", 3, 0, 256, 0);
+    match("line_matches whole flag of 65536", "xcat", 4, "cat", 3, 0, 65536, 0);
+    match("line_matches whole flag of -1", "xcat", 4, "cat", 3, 0, -1, 0);
+    /* The lengths are full ints. patlen gives the pattern bytes to compare. */
+    match("line_matches compares patlen bytes, not up to a NUL", "cat", 3, "cats", 3, 0, 0, 1);
+    {
+        static char big[65539];
+        memset(big, 'x', sizeof big);
+        memcpy(big + 65533, "cat", 3);
+        big[65536] = 0;
+        match("line_matches line past the low word", big, 65536, "cat", 3, 0, 0, 1);
+        big[0] = 'a';
+        match("line_matches pattern past the low word", "a", 1, big, 65536, 0, 0, 0);
+    }
     match("line_matches underscore after", "cat_", 4, "cat", 3, 0, 1, 0);
     match("line_matches underscore before", "_cat", 4, "cat", 3, 0, 1, 0);
     match("line_matches punctuation after", "cat.", 4, "cat", 3, 0, 1, 1);
@@ -321,6 +356,25 @@ static void parse_checks(void)
     parse_one("parse_args extra positional", 5, extra, -1, 0, NULL, NULL);
     parse_one("parse_args missing file", 2, no_file, -1, 0, NULL, NULL);
     parse_one("parse_args flag after the file", 4, flag_after_file, 0, FLAG_N, "cat", "f");
+
+    /* The offending byte returns as a positive int, also above 127. */
+    {
+        char high_flag[] = { '-', (char)0xFF, 0 };
+        char *high[] = { "rengrep", high_flag, "cat", "f" };
+        parse_one("parse_args unknown flag byte above 127", 4, high, 255, 0, NULL, NULL);
+    }
+    /* argc is a full int. */
+    {
+        char *many[258];
+        int i;
+        many[0] = "rengrep";
+        for (i = 1; i < 255; i++)
+            many[i] = "-n";
+        many[255] = "cat";
+        many[256] = "f";
+        many[257] = NULL;
+        parse_one("parse_args argc past the low byte", 257, many, 0, FLAG_N, "cat", "f");
+    }
 }
 
 /* --- the hostile caller --------------------------------------------- */
