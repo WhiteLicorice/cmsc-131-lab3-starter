@@ -29,7 +29,8 @@
 # The first run saves each grep output in .grep-cache, and later runs read
 # it from there. Only the first run starts grep 1344 times, so it takes the
 # longest. The script makes the cache again when the installed grep, this
-# script, or a test file changes.
+# script, a test file, or a saved output changes.
+#
 # grep exits 0 when it matched and 1 when it did not. Both are accepted.
 # grep exits 2 on an error, and that is a failure of the harness. rengrep
 # must exit 0 on every valid invocation.
@@ -55,16 +56,18 @@ actual="./.rengrep.out"
 trap 'rm -f "$actual"' EXIT
 
 # Read the file $2 into the variable named $1, with no new process. A shell
-# variable cannot hold a NUL byte, so each NUL becomes the byte \001 and
-# still counts. A CR before a newline is dropped, as
+# variable cannot hold a NUL byte. So each \001 becomes \001\001, and each
+# NUL becomes \001\002. Two files then give equal text only when they hold
+# equal bytes. A CR before a newline is dropped, as
 # diff --strip-trailing-cr drops it. The .exe on Windows writes \r\n, and
 # grep and the test files write \n.
 slurp() {
-    local part="" text=""
+    local part="" text="" sep=""
     while IFS= read -r -d '' part; do
-        text+="$part"$'\001'
+        text+="$sep${part//$'\001'/$'\001\001'}"
+        sep=$'\001\002'
     done < "$2"
-    text+="$part"
+    text+="$sep${part//$'\001'/$'\001\001'}"
     printf -v "$1" '%s' "${text//$'\r\n'/$'\n'}"
 }
 
@@ -91,25 +94,28 @@ patterns=( "cat" "Cat" "he " "e" "The quick brown fox jumps over the lazy dog" "
 
 files=( tests/*.txt )
 
-# The cache is current when its stamp names the installed grep and the test
-# files, and nothing it depends on is newer than the stamp. Each saved output
-# is numbered by its comparison, so an added or removed test file changes
-# the numbers. GitHub Actions sets CI. There the script always runs grep, so
-# a saved output committed to the repository cannot stand in for grep.
+# The cache key is a checksum of the grep program, this script, and each
+# test file, with their names. The script takes the key before grep runs.
+# After the last grep, the stamp records the key and a checksum of each saved
+# output. A later run reads the cache only when both checksums still match.
+# An edit to any of these files makes the cache again, also an edit made
+# during the first run. GitHub Actions sets CI. There the script always runs
+# grep, so a saved output committed to the repository cannot stand in for
+# grep.
 cache="./.grep-cache"
 stamp="$cache/stamp"
-grep_version="$(LC_ALL=C grep --version 2>/dev/null | head -n 1)"
-want_stamp="$grep_version"$'\n'"${files[*]}"$'\n'
+cells=$(( ${#flagsets[@]} * ${#patterns[@]} * ${#files[@]} ))
+outputs=()
+for (( n = 1; n <= cells; n++ )); do
+    outputs+=( "$n.out" )
+done
+key="$(cksum "$(type -P grep)" "$0" "${files[@]}" 2>&1)"
 cached=0
 if [ -z "${CI:-}" ] && [ -f "$stamp" ]; then
     slurp have "$stamp"
-    if [ "$have" = "$want_stamp" ]; then
+    sums="$(cd "$cache" && cksum "${outputs[@]}" 2>&1)"
+    if [ "$have" = "$key"$'\n'"$sums" ]; then
         cached=1
-        for dep in "$0" "${files[@]}"; do
-            if [ "$dep" -nt "$stamp" ]; then
-                cached=0
-            fi
-        done
     fi
 fi
 if [ "$cached" -eq 0 ]; then
@@ -127,7 +133,7 @@ for flags in "${flagsets[@]}"; do
             total=$((total + 1))
             expected="$cache/$total.out"
 
-            if [ "$cached" -eq 0 ] || [ ! -f "$expected" ]; then
+            if [ "$cached" -eq 0 ]; then
                 LC_ALL=C grep -F $flags "$pat" "$file" > "$expected" 2>/dev/null
                 gstatus=$?
                 if [ "$gstatus" -gt 1 ]; then
@@ -161,7 +167,8 @@ done
 
 # Write the stamp only after every grep output is saved.
 if [ "$cached" -eq 0 ] && [ "$grep_failed" -eq 0 ]; then
-    printf '%s' "$want_stamp" > "$stamp"
+    sums="$(cd "$cache" && cksum "${outputs[@]}" 2>&1)"
+    printf '%s\n%s' "$key" "$sums" > "$stamp"
 fi
 
 # Pass 2: the contract test.
