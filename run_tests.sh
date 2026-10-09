@@ -29,7 +29,8 @@
 # The first run saves each grep output in .grep-cache, and later runs read
 # it from there. Only the first run starts grep 1344 times, so it takes the
 # longest. The script makes the cache again when the installed grep, this
-# script, a test file, or a saved output changes.
+# script, a test file, or a saved output changes. When one of them changes
+# during a run, the script runs the tests again with grep.
 #
 # grep exits 0 when it matched and 1 when it did not. Both are accepted.
 # grep exits 2 on an error, and that is a failure of the harness. rengrep
@@ -99,7 +100,8 @@ files=( tests/*.txt )
 # After the last grep, the stamp records the key and a checksum of each saved
 # output. A later run reads the cache only when both checksums still match.
 # An edit to any of these files makes the cache again, also an edit made
-# during the first run. GitHub Actions sets CI. There the script always runs
+# during the first run. A run that reads the cache checks both again at the
+# end. GitHub Actions sets CI. There the script always runs
 # grep, so a saved output committed to the repository cannot stand in for
 # grep.
 cache="./.grep-cache"
@@ -127,6 +129,17 @@ if [ "$cached" -eq 0 ]; then
 fi
 grep_failed=0
 
+# A run that reads the cache keeps its failure lines until the end. The
+# check at the end can then discard them.
+held=""
+report() {
+    if [ "$cached" -eq 1 ]; then
+        held+="$1"$'\n'
+    else
+        echo "$1"
+    fi
+}
+
 for flags in "${flagsets[@]}"; do
     for pat in "${patterns[@]}"; do
         for file in "${files[@]}"; do
@@ -148,7 +161,7 @@ for flags in "${flagsets[@]}"; do
             "$bin" $flags "$pat" "$file" > "$actual" 2>/dev/null
             rstatus=$?
             if [ "$rstatus" -ne 0 ]; then
-                echo "FAIL  rengrep exited with status $rstatus: $flags '$pat' $file"
+                report "FAIL  rengrep exited with status $rstatus: $flags '$pat' $file"
                 failures=$((failures + 1))
                 continue
             fi
@@ -158,7 +171,7 @@ for flags in "${flagsets[@]}"; do
             slurp want "$expected"
             slurp got "$actual"
             if [[ "$got" != "$want" ]]; then
-                echo "FAIL  rengrep $flags '$pat' $file"
+                report "FAIL  rengrep $flags '$pat' $file"
                 failures=$((failures + 1))
             fi
         done
@@ -169,6 +182,22 @@ done
 if [ "$cached" -eq 0 ] && [ "$grep_failed" -eq 0 ]; then
     sums="$(cd "$cache" && cksum "${outputs[@]}" 2>&1)"
     printf '%s\n%s' "$key" "$sums" > "$stamp"
+fi
+
+# A change during a cached run makes some saved outputs wrong for the files
+# that rengrep read. The script then runs the tests again with grep. That
+# run does not read the cache, so it does not come back here.
+if [ "$cached" -eq 1 ]; then
+    now="$(cksum "$(type -P grep)" "$0" "${files[@]}" 2>&1)"
+    sums="$(cd "$cache" && cksum "${outputs[@]}" 2>&1)"
+    if [ "$have" != "$now"$'\n'"$sums" ]; then
+        echo "grep, $0, a test file, or a saved output changed during the run."
+        echo "The script runs the tests again with grep."
+        echo
+        rm -f "$stamp" "$actual"
+        exec "$BASH" "$0"
+    fi
+    printf '%s' "$held"
 fi
 
 # Pass 2: the contract test.
