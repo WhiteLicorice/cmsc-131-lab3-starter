@@ -191,7 +191,8 @@ static void matches_checks(void)
     match("line_matches whole word standalone", line, 11, "cat", 3, 0, 1, 1);
     match("line_matches whole line", "cat", 3, "cat", 3, 0, 1, 1);
     match("line_matches word character before", "xcat", 4, "cat", 3, 0, 1, 0);
-    match("line_matches underscore before", "cat_", 4, "cat", 3, 0, 1, 0);
+    match("line_matches underscore after", "cat_", 4, "cat", 3, 0, 1, 0);
+    match("line_matches underscore before", "_cat", 4, "cat", 3, 0, 1, 0);
     match("line_matches punctuation after", "cat.", 4, "cat", 3, 0, 1, 1);
 
     /* The buffer must return unchanged, whatever the flags. */
@@ -300,6 +301,8 @@ static void parse_checks(void)
     char *unknown[]   = { "rengrep", "-x", "cat", "f" };
     char *unknown_grouped[] = { "rengrep", "-nx", "cat", "f" };
     char *extra[]     = { "rengrep", "-n", "cat", "f", "extra" };
+    char *no_file[]   = { "rengrep", "cat" };
+    char *flag_after_file[] = { "rengrep", "cat", "f", "-n" };
 
     parse_one("parse_args grouped flags", 4, grouped, 0, FLAG_N | FLAG_V | FLAG_I, "cat", "tests/sample.txt");
     parse_one("parse_args repeated flag", 5, repeated, 0, FLAG_N, "cat", "f");
@@ -312,6 +315,8 @@ static void parse_checks(void)
     parse_one("parse_args unknown flag", 4, unknown, 'x', 0, NULL, NULL);
     parse_one("parse_args unknown flag in a group", 4, unknown_grouped, 'x', 0, NULL, NULL);
     parse_one("parse_args extra positional", 5, extra, -1, 0, NULL, NULL);
+    parse_one("parse_args missing file", 2, no_file, -1, 0, NULL, NULL);
+    parse_one("parse_args flag after the file", 4, flag_after_file, 0, FLAG_N, "cat", "f");
 }
 
 /* --- the hostile caller --------------------------------------------- */
