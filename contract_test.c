@@ -219,8 +219,11 @@ static void matches_checks(void)
     match("line_matches whole flag of 256", "xcat", 4, "cat", 3, 0, 256, 0);
     match("line_matches whole flag of 65536", "xcat", 4, "cat", 3, 0, 65536, 0);
     match("line_matches whole flag of -1", "xcat", 4, "cat", 3, 0, -1, 0);
+    match("line_matches fold flag of 1 << 24", "CAT", 3, "cat", 3, 1 << 24, 0, 1);
+    match("line_matches whole flag of 1 << 24", "xcat", 4, "cat", 3, 0, 1 << 24, 0);
     /* The lengths are full ints. patlen gives the pattern bytes to compare. */
     match("line_matches compares patlen bytes, not up to a NUL", "cat", 3, "cats", 3, 0, 0, 1);
+    match("line_matches folding compares patlen bytes, not up to a NUL", "CAT", 3, "cats", 3, 1, 0, 1);
     {
         static char big[65539];
         memset(big, 'x', sizeof big);
@@ -229,6 +232,15 @@ static void matches_checks(void)
         match("line_matches line past the low word", big, 65536, "cat", 3, 0, 0, 1);
         big[0] = 'a';
         match("line_matches pattern past the low word", "a", 1, big, 65536, 0, 0, 0);
+    }
+    /* Equal lengths past the low word. Both paths compare every byte. */
+    {
+        static char line_a[65537];
+        static char pat_b[65537];
+        memset(line_a, 'a', 65536);
+        memset(pat_b, 'b', 65536);
+        match("line_matches comparison count past the low word", line_a, 65536, pat_b, 65536, 0, 0, 0);
+        match("line_matches folding comparison count past the low word", line_a, 65536, pat_b, 65536, 1, 0, 0);
     }
     match("line_matches underscore after", "cat_", 4, "cat", 3, 0, 1, 0);
     match("line_matches underscore before", "_cat", 4, "cat", 3, 0, 1, 0);
