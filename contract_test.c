@@ -290,6 +290,10 @@ static void matches_checks(void)
     match("line_matches empty pattern on an empty line", "", 0, "", 0, 0, 0, 1);
     match("line_matches empty pattern with -w on an empty line", "", 0, "", 0, 0, 1, 1);
     match("line_matches empty pattern with -w on a line", "a b", 3, "", 0, 0, 1, 0);
+    /* linelen bounds the empty-pattern search too. Past linelen, the stored
+       space at offset 3 makes offset 4 a whole-word match. */
+    match("line_matches empty pattern with -w stops at linelen", "abc ", 3, "", 0, 0, 1, 0);
+    match("line_matches folding empty pattern with -w stops at linelen", "abc ", 3, "", 0, 1, 1, 0);
     match("line_matches folding", "The Cat Ran", 11, "cat", 3, 1, 0, 1);
     match("line_matches without folding", "The Cat Ran", 11, "cat", 3, 0, 0, 0);
     match("line_matches nonzero fold other than one", "CAT", 3, "cat", 3, 2, 0, 1);
