@@ -119,18 +119,27 @@ static int run_lines(const char *name, const char *how, char *buf, int len, int 
    wanted count, the case runs again with a capacity of 65536, and again
    padded with 'x' to a length of exactly 65536. The case also runs after a
    first line of 65536 bytes. len and max then pass the low word on every
-   path. */
+   path. The case also runs with two more lines stored after len. The
+   routine reads len bytes only, so the result stays the same. */
 static void check_lines(const char *name, char *buf, int len, int max,
                         int want_count, const struct line *want)
 {
     static struct line wide_out[65537];
     static char wide_buf[65537 + 4096];
+    static char tail_buf[4096 + 8];
     struct line out[8];
     struct line wide_want[9];
     int i;
 
     if (!run_lines(name, "as given", buf, len, max, want_count, want, out, 8))
         return;
+    if (len <= 4096) {
+        memcpy(tail_buf, buf, len);
+        memcpy(tail_buf + len, "x\ny\n", 5);
+        if (!run_lines(name, "with lines stored after len", tail_buf, len, max,
+                       want_count, want, out, 8))
+            return;
+    }
     if (len <= 4096 && want_count <= 8) {
         if (want_count > 0 && max > want_count
             && !run_lines(name, "capacity 65536", buf, len, 65536, want_count, want, wide_out, 16))
@@ -249,11 +258,16 @@ static int match_once(const char *name, const char *how, char *line, int linelen
 /* Each case also runs in wide forms. A nonzero flag runs again as each
    one-bit value and as -1. When the pattern has no space, the case runs
    again after 65536 leading spaces. A space is not a word character, so the
-   result stays the same. */
+   result stays the same. The case also runs with bytes stored past linelen
+   and past patlen. The routine reads neither, so the result stays the same.
+   One line tail is a word byte. The other holds the pattern between
+   non-word bytes. The pattern tail is a word byte. */
 static void match(const char *name, char *line, int linelen, char *pat, int patlen,
                   int fold, int whole, int want)
 {
     static char wide[65536 + 4096];
+    static char tail_line[4096 + 4096 + 8];
+    static char tail_pat[4096 + 8];
     char how[48];
     int k;
 
@@ -275,6 +289,24 @@ static void match(const char *name, char *line, int linelen, char *pat, int patl
                         pat, patlen, fold, whole, want))
             return;
     }
+    if (linelen <= 4096 && patlen <= 4096) {
+        memcpy(tail_line, line, linelen);
+        memcpy(tail_line + linelen, "x", 2);
+        if (!match_once(name, "word byte stored after linelen", tail_line, linelen,
+                        pat, patlen, fold, whole, want))
+            return;
+        tail_line[linelen] = ' ';
+        memcpy(tail_line + linelen + 1, pat, patlen);
+        memcpy(tail_line + linelen + 1 + patlen, "  ", 3);
+        if (!match_once(name, "pattern stored after linelen", tail_line, linelen,
+                        pat, patlen, fold, whole, want))
+            return;
+        memcpy(tail_pat, pat, patlen);
+        memcpy(tail_pat + patlen, "x", 2);
+        if (!match_once(name, "word byte stored after patlen", line, linelen,
+                        tail_pat, patlen, fold, whole, want))
+            return;
+    }
     ok(name);
 }
 
@@ -290,6 +322,15 @@ static void matches_checks(void)
     match("line_matches empty pattern on an empty line", "", 0, "", 0, 0, 0, 1);
     match("line_matches empty pattern with -w on an empty line", "", 0, "", 0, 0, 1, 1);
     match("line_matches empty pattern with -w on a line", "a b", 3, "", 0, 0, 1, 0);
+    /* The empty-pattern search runs to linelen at full width. The only
+       whole-word position is offset 65536, after the space at offset 65535. */
+    {
+        static char late_space[65537];
+        memset(late_space, 'a', 65535);
+        late_space[65535] = ' ';
+        match("line_matches empty pattern with -w at offset 65536", late_space, 65536, "", 0, 0, 1, 1);
+        match("line_matches folding empty pattern with -w at offset 65536", late_space, 65536, "", 0, 1, 1, 1);
+    }
     /* linelen bounds the empty-pattern search too. Past linelen, the stored
        space at offset 3 makes offset 4 a whole-word match. */
     match("line_matches empty pattern with -w stops at linelen", "abc ", 3, "", 0, 0, 1, 0);
