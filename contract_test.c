@@ -318,6 +318,11 @@ static void matches_checks(void)
     match("line_matches folding whole word before, patlen not up to a NUL", "XCAT", 4, "cats", 3, 1, 1, 0);
     match("line_matches whole word after, patlen not up to a NUL", "cat_", 4, "cats", 3, 0, 1, 0);
     match("line_matches whole word match, patlen not up to a NUL", "cat x", 5, "cats", 3, 0, 1, 1);
+    match("line_matches folding whole word after, patlen not up to a NUL", "CAT_", 4, "cats", 3, 1, 1, 0);
+    match("line_matches folding whole word match, patlen not up to a NUL", "CAT x", 5, "cats", 3, 1, 1, 1);
+    /* linelen ends the line, also when its storage holds more bytes. */
+    match("line_matches whole word at linelen, not at a NUL", "catX", 3, "cat", 3, 0, 1, 1);
+    match("line_matches folding whole word at linelen, not at a NUL", "CATX", 3, "cat", 3, 1, 1, 1);
     {
         static char big[65539];
         memset(big, 'x', sizeof big);
