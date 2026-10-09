@@ -126,20 +126,24 @@ static void check_lines(const char *name, char *buf, int len, int max,
 {
     static struct line wide_out[65537];
     static char wide_buf[65537 + 4096];
-    static char tail_buf[4096 + 8];
+    static char tail_buf[65540 + 8];
     struct line out[8];
     struct line wide_want[9];
     int i;
 
     if (!run_lines(name, "as given", buf, len, max, want_count, want, out, 8))
         return;
-    if (len <= 4096) {
-        memcpy(tail_buf, buf, len);
-        memcpy(tail_buf + len, "x\ny\n", 5);
-        if (!run_lines(name, "with lines stored after len", tail_buf, len, max,
-                       want_count, want, out, 8))
-            return;
+    /* The tail buffers hold a case of up to 65540 bytes. A longer case fails
+       here, so the storage-tail form cannot skip it. */
+    if (len > 65540) {
+        fail(name, "the case is too long for the storage-tail form");
+        return;
     }
+    memcpy(tail_buf, buf, len);
+    memcpy(tail_buf + len, "x\ny\n", 5);
+    if (!run_lines(name, "with lines stored after len", tail_buf, len, max,
+                   want_count, want, out, 8))
+        return;
     if (len <= 4096 && want_count <= 8) {
         if (want_count > 0 && max > want_count
             && !run_lines(name, "capacity 65536", buf, len, 65536, want_count, want, wide_out, 16))
@@ -266,8 +270,8 @@ static void match(const char *name, char *line, int linelen, char *pat, int patl
                   int fold, int whole, int want)
 {
     static char wide[65536 + 4096];
-    static char tail_line[4096 + 4096 + 8];
-    static char tail_pat[4096 + 8];
+    static char tail_line[65540 + 1 + 65540 + 8];
+    static char tail_pat[65540 + 8];
     char how[48];
     int k;
 
@@ -289,24 +293,28 @@ static void match(const char *name, char *line, int linelen, char *pat, int patl
                         pat, patlen, fold, whole, want))
             return;
     }
-    if (linelen <= 4096 && patlen <= 4096) {
-        memcpy(tail_line, line, linelen);
-        memcpy(tail_line + linelen, "x", 2);
-        if (!match_once(name, "word byte stored after linelen", tail_line, linelen,
-                        pat, patlen, fold, whole, want))
-            return;
-        tail_line[linelen] = ' ';
-        memcpy(tail_line + linelen + 1, pat, patlen);
-        memcpy(tail_line + linelen + 1 + patlen, "  ", 3);
-        if (!match_once(name, "pattern stored after linelen", tail_line, linelen,
-                        pat, patlen, fold, whole, want))
-            return;
-        memcpy(tail_pat, pat, patlen);
-        memcpy(tail_pat + patlen, "x", 2);
-        if (!match_once(name, "word byte stored after patlen", line, linelen,
-                        tail_pat, patlen, fold, whole, want))
-            return;
+    /* The tail buffers hold a case of up to 65540 bytes. A longer case fails
+       here, so the storage-tail forms cannot skip it. */
+    if (linelen > 65540 || patlen > 65540) {
+        fail(name, "the case is too long for the storage-tail forms");
+        return;
     }
+    memcpy(tail_line, line, linelen);
+    memcpy(tail_line + linelen, "x", 2);
+    if (!match_once(name, "word byte stored after linelen", tail_line, linelen,
+                    pat, patlen, fold, whole, want))
+        return;
+    tail_line[linelen] = ' ';
+    memcpy(tail_line + linelen + 1, pat, patlen);
+    memcpy(tail_line + linelen + 1 + patlen, "  ", 3);
+    if (!match_once(name, "pattern stored after linelen", tail_line, linelen,
+                    pat, patlen, fold, whole, want))
+        return;
+    memcpy(tail_pat, pat, patlen);
+    memcpy(tail_pat + patlen, "x", 2);
+    if (!match_once(name, "word byte stored after patlen", line, linelen,
+                    tail_pat, patlen, fold, whole, want))
+        return;
     ok(name);
 }
 
