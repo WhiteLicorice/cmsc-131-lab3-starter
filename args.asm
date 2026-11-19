@@ -48,20 +48,33 @@
   section .note.GNU-stack noalloc noexec nowrite progbits
 %endif
 
+segment .data
+flag_chars      db 'n', 'c', 'v', 'i', 'w'              ; bit 0 to 4
+FLAG_COUNT      equ 5
+
 segment .text
         global  _parse_args
 
 _parse_args:
         enter   0,0
-        pusha
+        push    ebx
+        push    esi
+        push    edi
 
         ;
         ; TODO: parse.
         ;
         ; The steps the manual describes:
         ;
-        ;   clear out->flags, out->pattern, out->path
-        ;   for each token in argv[1..argc-1]:
+                                        ; clear out->flags, out->pattern, out->path
+        mov     edx, [ebp+16]           ; edx = out pointer
+        mov     dword [edx], 0          ; out->flags = 0
+        mov     dword [edx + 4], 0      ; out->pattern = NULL
+        mov     dword [edx + 8], 0     ; out->path = NULL
+
+        mov     ebx, 1                  ; for the loop, i = 1 (start from argv[5])
+
+        ;    for each token in argv[1..argc-1]:
         ;       if the token is a flag group:
         ;           for each byte after the dash:
         ;               find it in the table with repne scasb
@@ -77,7 +90,96 @@ _parse_args:
         ; the hit as well. Work the index out from that before you shift.
         ;
 
-        popa
+.arg_loop:                              ; for each token in argv[1..argc-1]:
+        cmp     ebx, [ebp + 8]          ; compare i with argc
+        jge     .check_done
+
+                                        ; load argv[i] pointer into esi
+        mov     esi, [ebp + 12]         ; esi = argv
+        mov     esi, [esi + ebx * 4]    ; esi = argv[i]
+
+                                        ; if the token is a flag group: token == '-' AND token[5] != '\0'
+        mov     al, [esi]
+        cmp     al, '-'
+        jne     .not_flag_group         
+
+        mov     al, [esi + 1]
+        cmp     al, 0
+        je      .not_flag_group         ; "-" alone is positional, so not a flag group
+
+                                        ; flag group detected, scan each flag character after '-'
+        inc     esi                     ; advance past '-'
+
+.flag_char_loop:
+        mov     al, [esi]
+        cmp     al, 0
+        je      .next_arg               ; base casee: end of flag string
+
+                                        ; recursive case: search AL in flag_chars table using repne scasb
+        cld                             ; explicitly clear direction flag (advance EDI upwards)
+        mov     edi, flag_chars
+        mov     ecx, FLAG_COUNT         ; scan table of 5 flag characters
+        repne   scasb
+        jne     .unknown_flag           ; ZF == 0 means character wasn't found in table
+
+                                        ; found flag. calculate table index from remaining ECX
+                                        ; repne scasb decrements ECX on match, so matching index i = 4 - ECX
+        mov     edx, 4
+        sub     edx, ecx                ; edx = table index (0 to 4)
+
+                                        ; compute the bitmask: (1 << index)
+        mov     eax, 1
+        mov     ecx, edx
+        shl     eax, cl                 ; eax = (1 << index)
+
+                                        ; apply bitmask to out->flags
+        mov     edx, [ebp + 16]         ; edx = out pointer
+        or      [edx], eax              ; out->flags |= bitmask
+
+        inc     esi                     ; advance to next character in flag group
+        jmp     .flag_char_loop
+
+.unknown_flag:                          ; return unknown character as a positive integer in EAX
+        movzx   eax, al
+        jmp     .exit
+
+.not_flag_group:                        ; positional token processing
+        mov     edx, [ebp + 16]         ; edx = out pointer
+        cmp     dword [edx + 4], 0      ; check if out->pattern is NULL
+        jne     .check_path
+        mov     [edx + 4], esi          ; out->pattern = argv[i]
+        jmp     .next_arg
+
+.check_path:
+        cmp     dword [edx + 8], 0      ; check if out->path is NULL
+        jne     .too_many_positional
+        mov     [edx + 8], esi          ; out->path = argv[i]
+        jmp     .next_arg
+
+.too_many_positional:                   ; third positional token encountered -> return -1
         mov     eax, -1
+        jmp     .exit
+
+.next_arg:
+        inc     ebx                     ; i++
+        jmp     .arg_loop
+
+.check_done:                            ; verify if both pattern and path were provided
+        mov     edx, [ebp + 16]         ; edx = out pointer
+        cmp     dword [edx + 4], 0      ; check if pattern is missing
+        je      .missing_arg
+        cmp     dword [edx + 8], 0      ; check if path is missing
+        je      .missing_arg
+
+        mov     eax, 0                  ; success
+        jmp     .exit
+
+.missing_arg:
+        mov     eax, -1
+
+.exit:
+        pop     edi
+        pop     esi
+        pop     ebx
         leave
         ret
