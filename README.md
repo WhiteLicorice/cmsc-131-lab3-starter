@@ -84,6 +84,17 @@ Keep each part short. Update it when the plan changes.
 The five flags and what each one does. What the oracle is, and what
 agreement with it means for a line that matches inside a longer word.
 
+The five flags and what they do:
+- `-n`: prefix each matching line with its 1-based line number and a colon
+- `-c`: print only the count of matching lines (overrides all other output, so `-n -c` prints just the count)
+- `-v`: print the lines that do not match (with `-c`, count those instead)
+- `-i`: ignore upper/lower case, but still print the line as it appeared
+- `-w`: match whole words only
+
+Note: No flag just prints the matching lines.
+
+The oracle for this laboratory is `grep`, run as `LC_ALL=C grep -F`, a command that searches a file for lines containing some text that is already installed in our machine. `make check` runs 1344 comparisons against it, and correctness just means byte-identical output. Because `rengrep` is a tool subset of `grep -F`, both of them treats the pattern as a literal substring, not a word. So `cat` matches `concatenate`,and agreeing with `grep` means `rengrep` should print that line, unless checked with a `-w` flag, of which case the whole-word boundary check around that exact literal string is applied.
+
 ### Solution architecture
 
 How the four routines split the work. How the line index is built from
@@ -97,9 +108,9 @@ who owns it.
 
 | Week | Goal | Owner |
 |---|---|---|
-| 1 | | |
-| 2 | | |
-| 3 | | |
+| 1 | Buffering and lines, flags (`args.asm`, `lines.asm`) | Ryona Cassandra P. Honrado |
+| 2 | Matching (`match.asm`) | |
+| 3 | Formatting and additional tests (`fmt.asm`) | |
 | 4 | Defense | |
 
 ## Subsystem Ownership
@@ -110,9 +121,9 @@ share one. The commit history must agree with this table.
 
 | Subsystem | Owner |
 |---|---|
-| Buffering and lines (`lines.asm`) | |
+| Buffering and lines (`lines.asm`) | Ryona Cassandra P. Honrado |
 | Matching (`match.asm`) | |
-| Formatting and flags (`fmt.asm`, `args.asm`, the tests you add) | |
+| Formatting and flags (`fmt.asm`, `args.asm`, the tests you add) | Ryona Cassandra P. Honrado &  |
 
 ## Quirks and Issues
 
