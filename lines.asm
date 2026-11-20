@@ -76,9 +76,26 @@ _index_lines:
         ;       esi     pointer to the next free struct line in out
         ;       edi     scan cursor into buf (scasb advances it)
         ;       [ebp-4] the return value, parked here because popa restores eax
+        ;
+        ; stack frame:
+        ;       The contract, from driver.c:
+        ;
+        ;       int max                     [ebp+20]
+        ;       struct line *out            [ebp+16]
+        ;       int len                     [ebp+12]
+        ;       char *buf                   [ebp+8]
+        ;
+        ;       struct line { int offset; int length; };
         ; --------------------------------------------------------------------------------------
 
-        
+        cld 
+
+        mov     edi, [ebp + 8]          ; scan cursor = buf
+        mov     ecx, [ebp + 12]         ; bytes left = len (counter for scasb)
+        mov     esi, [ebp + 16]         ; next free struct line slot = out 
+        xor     ebx, ebx                ; entries written = 0
+        xor     edx, edx                ; current line starts at offset = 0
+
 
         popa
         mov     eax, 0
