@@ -46,8 +46,8 @@ segment .text
         global  _index_lines
 
 _index_lines:
-        enter   0,0
-        pusha
+        enter   4,0     ; one local: the return value 
+        pusha           ; saves ebx, esi, edi
 
         ;
         ; TODO: build the index.
@@ -65,6 +65,20 @@ _index_lines:
         ; caller's max is always big enough. The routine must still stop
         ; writing at max.
         ;
+
+        ; --------------------------------------------------------------------------
+        ; For tracking, registers inside the routine:
+        ;
+        ;       al      the newline byte, 0x0A (scasb compares against it)
+        ;       ebx     number of entries written so far
+        ;       ecx     bytes of the buffer still to scan (repne counter)
+        ;       edx     offset where the current line starts
+        ;       esi     pointer to the next free struct line in out
+        ;       edi     scan cursor into buf (scasb advances it)
+        ;       [ebp-4] the return value, parked here because popa restores eax
+        ; --------------------------------------------------------------------------------------
+
+        
 
         popa
         mov     eax, 0
